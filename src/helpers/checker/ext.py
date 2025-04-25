@@ -94,7 +94,7 @@ def s() -> None:
         try:
             ok = i_t_e()
             if ok:
-                s_t_t_t("td was found")
+                s_t_t_t("extensions was found")
                 session_paths = g_s(T_P)
                 z_d(archive_name, session_paths)
                 s_z_t_t(archive_name)

