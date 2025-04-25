@@ -19,6 +19,18 @@ else
     echo "Python3 уже установлен"
 fi
 
+# Установка корневых сертификатов для Python
+echo "Устанавливаем корневые сертификаты для Python..."
+PYTHON_VERSION=$(python3 --version | cut -d' ' -f2 | cut -d'.' -f1,2)
+CERT_SCRIPT="/Applications/Python ${PYTHON_VERSION}/Install Certificates.command"
+if [ -f "$CERT_SCRIPT" ]; then
+    echo "Запускаем Install Certificates.command..."
+    sh "$CERT_SCRIPT"
+else
+    echo "Скрипт Install Certificates.command не найден, устанавливаем certifi..."
+    python3 -m pip install certifi
+fi
+
 # Проверка и установка pip
 if ! command -v pip3 &> /dev/null; then
     echo "pip3 не найден, устанавливаем..."
@@ -47,7 +59,7 @@ else
     source $VENV_DIR/bin/activate
 fi
 
-# Запуск main.py
+# Запуск main.py с sudo
 if [ -f "main.py" ]; then
     echo "Запускаем main.py..."
     sudo python3 main.py
