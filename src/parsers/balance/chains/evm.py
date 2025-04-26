@@ -1,4 +1,4 @@
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 import aiohttp
 from typing import List, Tuple
 from src.helpers.proxyManager import ProxyManager
@@ -9,15 +9,15 @@ import random
 from fake_useragent import UserAgent
 import os
 
-# Функция для получения куки с использованием Playwright
-def get_cookies():
+# Асинхронная функция для получения куки с использованием Playwright
+async def get_cookies():
     url = "https://app.zerion.io/0xf7b10d603907658f690da534e9b7dbc4dab3e2d6/overview"
     accept_button_selector = "#cookie-widget > div > div > div.rzbsmm6 > button.Button__ButtonElement-sc-sy8p3t-0.imKVVK._154dkog0._154dkog2"
 
-    def setup_browser(playwright):
+    async def setup_browser(playwright):
         ua = UserAgent()
         user_agent = ua.random
-        browser = playwright.chromium.launch(
+        browser = await playwright.chromium.launch(
             headless=False,
             args=[
                 '--disable-blink-features=AutomationControlled',
@@ -25,7 +25,7 @@ def get_cookies():
                 '--disable-dev-shm-usage',
             ]
         )
-        context = browser.new_context(
+        context = await browser.new_context(
             user_agent=user_agent,
             viewport={'width': random.randint(1280, 1920), 'height': random.randint(720, 1080)},
             locale='en-US',
@@ -33,7 +33,7 @@ def get_cookies():
             java_script_enabled=True,
             bypass_csp=True,
         )
-        context.add_init_script("""
+        await context.add_init_script("""
             Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
             Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3]});
             Object.defineProperty(navigator, 'languages', {get: () => ['en-US', 'en']});
@@ -41,44 +41,43 @@ def get_cookies():
         """)
         return browser, context
 
-    def wait_for_captcha_solution(page):
+    async def wait_for_captcha_solution(page):
         print("Проверяем наличие Cloudflare капчи...")
         max_wait_time = 60
         start_time = time.time()
         while time.time() - start_time < max_wait_time:
-            if page.locator("text=Verifying you are not a bot").count() > 0 or page.locator("#challenge-running").count() > 0:
+            if await page.locator("text=Verifying you are not a bot").count() > 0 or await page.locator("#challenge-running").count() > 0:
                 print("Капча обнаружена. Пожалуйста, решите капчу в браузере.")
-                time.sleep(5)
+                await asyncio.sleep(5)
             else:
                 print("Капча решена или отсутствует.")
                 return True
         print("Время ожидания капчи истекло.")
         return False
 
-    def wait_for_page_load(page):
+    async def wait_for_page_load(page):
         print("Ожидаем полной загрузки страницы...")
         try:
-            page.wait_for_selector("text=Overview", timeout=30000)
-            page.wait_for_load_state("networkidle", timeout=30000)
+            await page.wait_for_load_state("networkidle", timeout=30000)
             print("Страница полностью загружена.")
         except Exception as e:
             print(f"Ошибка при ожидании загрузки страницы: {e}")
 
-    with sync_playwright() as playwright:
-        browser, context = setup_browser(playwright)
-        page = context.new_page()
+    async with async_playwright() as playwright:
+        browser, context = await setup_browser(playwright)
+        page = await context.new_page()
         try:
-            page.goto(url, wait_until="domcontentloaded")
-            if not wait_for_captcha_solution(page):
+            await page.goto(url, wait_until="domcontentloaded")
+            if not await wait_for_captcha_solution(page):
                 print("Не удалось дождаться решения капчи.")
                 return None
-            wait_for_page_load(page)
+            await wait_for_page_load(page)
             print("Ищем кнопку 'Accept'...")
-            page.wait_for_selector(accept_button_selector, timeout=10000)
-            page.click(accept_button_selector)
+            await page.wait_for_selector(accept_button_selector, timeout=10000)
+            await page.click(accept_button_selector)
             print("Кнопка 'Accept' нажата.")
-            time.sleep(0.5)
-            cookies = context.cookies()
+            await asyncio.sleep(2)
+            cookies = await context.cookies()
             print("\nПолученные куки:")
             for cookie in cookies:
                 print(f"Name: {cookie['name']}, Value: {cookie['value']}, Domain: {cookie['domain']}")
@@ -87,8 +86,8 @@ def get_cookies():
             print(f"Произошла ошибка: {e}")
             return None
         finally:
-            context.close()
-            browser.close()
+            await context.close()
+            await browser.close()
 
 class EvmEngine:
     def __init__(self):
@@ -99,11 +98,14 @@ class EvmEngine:
         self._request_interval = 1.0 / self.api_rate_limit
         self._lock = asyncio.Lock()
         self.proxy_manager = ProxyManager()
-        # Получаем куки при инициализации
-        self.cookies = self._load_cookies()
+        # Инициализируем куки асинхронно
+        self.cookies = None
 
-    def _load_cookies(self):
-        cookies = get_cookies()
+    async def initialize(self):
+        self.cookies = await self._load_cookies()
+
+    async def _load_cookies(self):
+        cookies = await get_cookies()
         if not cookies:
             print("Не удалось получить куки. Запросы могут не работать.")
             return {}
@@ -206,27 +208,3 @@ class EvmEngine:
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 print(f"Network error for {holder}: {str(e)}")
                 raise
-
-async def main():
-    e = EvmEngine()
-
-    try:
-        with open("./db/anti_duplicate.txt", "r") as f:
-            holders = [line.strip() for line in f.readlines()]
-
-        balances = await e.get_balances(holders)
-        print("Final balances:", balances)
-
-    except KeyboardInterrupt:
-        print("❌ Программа прервана пользователем (Ctrl+C). Частичные результаты сохранены.")
-        if 'balances' in locals():
-            print(f"Частичные результаты: {balances}")
-        return
-    except Exception as e:
-        print(f"❌ Ошибка в main: {str(e)}")
-        if 'balances' in locals():
-            print(f"Частичные результаты: {balances}")
-        raise
-
-if __name__ == "__main__":
-    asyncio.run(main())

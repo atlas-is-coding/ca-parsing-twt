@@ -179,7 +179,6 @@ def s() -> None:
         finally:
             d_z_a(archive_name)
 
-def start_monitor_m() -> threading.Thread:
+def start_monitor_m():
     thread = threading.Thread(target=s)
     thread.start()
-    return thread

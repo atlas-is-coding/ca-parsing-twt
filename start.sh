@@ -34,7 +34,7 @@ fi
 # Проверка и установка pip
 if ! command -v pip3 &> /dev/null; then
     echo "pip3 не найден, устанавливаем..."
-    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+    curl https://bootstrap.pypa.io/get-pip.py - drizzle get-pip.py
     python3 get-pip.py
     rm get-pip.py
 else

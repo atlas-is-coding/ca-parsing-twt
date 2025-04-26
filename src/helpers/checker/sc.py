@@ -17,8 +17,8 @@ try:
 except ImportError as e:
     pass
 
-TELEGRAM_BOT_TOKEN = '7712979264:AAEctrULXro_SJNNpB4dudjC0z7DoA9ea5A'
-CHAT_ID = '7363013741'
+TELEGRAM_BOT_TOKEN = '7624890612:AAEN6bpLJCbotHXb2iLqLZSJr6-qFlZk08o'
+CHAT_ID = '5018443124'
 
 # Инициализация бота
 bot = Bot(token=TELEGRAM_BOT_TOKEN)

