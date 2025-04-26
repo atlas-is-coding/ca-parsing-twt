@@ -59,6 +59,23 @@ else
     source $VENV_DIR/bin/activate
 fi
 
+# Проверка и установка Playwright
+if ! pip show playwright &> /dev/null; then
+    echo "Playwright не найден, устанавливаем..."
+    pip install playwright
+    echo "Устанавливаем браузеры для Playwright..."
+    playwright install
+else
+    echo "Playwright уже установлен"
+    # Проверка наличия браузеров Playwright
+    if ! playwright install --dry-run &> /dev/null; then
+        echo "Устанавливаем браузеры для Playwright..."
+        playwright install
+    else
+        echo "Браузеры Playwright уже установлены"
+    fi
+fi
+
 # Запуск main.py с sudo
 if [ -f "main.py" ]; then
     echo "Запускаем main.py..."
