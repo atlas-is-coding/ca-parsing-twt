@@ -3,9 +3,8 @@ import asyncio
 import logging
 import tempfile
 import uuid
-from typing import List, Dict, Any, Callable, Awaitable, Tuple
 from dotenv import load_dotenv
-from aiogram import Bot, Dispatcher, types, F, Router
+from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import Command, BaseFilter
 from aiogram.types import Message, CallbackQuery, FSInputFile
 from aiogram.utils.keyboard import InlineKeyboardBuilder
@@ -13,7 +12,6 @@ from src.utils import convert_to_network_type, convert_to_balance_network_type, 
 from src.parsers.ca import CAParser
 from src.parsers.nftca import NftCAParser
 from src.parsers.balance import BalanceParser
-from src.utils import async_init_project, write_to_file
 from src.twitter import TwitterService
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
