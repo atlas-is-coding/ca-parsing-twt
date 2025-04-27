@@ -22,7 +22,6 @@ class ProxyManager:
             with open("proxies.txt", "r") as f:
                 self._proxies = [line.strip() for line in f if line.strip() and not line.startswith('#')]
             
-            # Remove trailing colons if present
             self._proxies = [proxy[:-1] if proxy.endswith(':') else proxy for proxy in self._proxies]
             
             random.shuffle(self._proxies)
@@ -120,7 +119,6 @@ class ProxyManager:
                     
             except Exception as e:
                 print(f"❌ Ошибка с прокси {current_proxy}: {str(e)}")
-                # Try next proxy on any error
                 current_proxy = self.get_proxy()
                 
                 if not current_proxy:
