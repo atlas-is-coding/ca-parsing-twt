@@ -288,3 +288,14 @@ class EvmEngine:
                         raise
                     await asyncio.sleep(self._backoff_time)
                     self._backoff_time = min(self._backoff_time * 2, 60)
+
+async def main():
+    evm = EvmEngine()
+    with open("db/anti_duplicate.txt", "r") as f:
+        holders = [line.strip() for line in f.readlines()]
+
+        await evm.get_balances(holders)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

