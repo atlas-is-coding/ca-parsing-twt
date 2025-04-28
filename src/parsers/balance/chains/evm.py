@@ -220,7 +220,7 @@ class EvmEngine:
 
     async def __get_balance(self, holder: str) -> float:
         proxy = self.proxy_manager.get_proxy()
-        url = f"https://api.zerion.io/v1/wallets/{holder}/portfolio?filter[positions]=no_filter&currency=usd"
+        url = f"https://api.zerion.io/v1/wallets/{holder}/portfolio?filter[positions]=no_filter¤cy=usd"
 
         headers = {
             "accept": "application/json",
@@ -232,21 +232,17 @@ class EvmEngine:
             async with self._rate_limiter:
                 async with self._lock:
                     current_time = time.time()
-
-                    # Проверка времени сброса лимита
                     if current_time >= self._reset_time and self._remaining_requests == 0:
                         self._remaining_requests = 100
                         self._backoff_time = 1.0
                         logger.info("Сброс лимита запросов")
 
-                    # Проверка доступных запросов
                     if self._remaining_requests <= 0:
                         wait_time = self._reset_time - current_time
                         if wait_time > 0:
                             logger.info(f"Достигнут лимит запросов. Ожидание {wait_time:.2f} секунд")
                             await asyncio.sleep(wait_time)
 
-                    # Задержка между запросами
                     elapsed = current_time - self._last_request_time
                     if elapsed < self._request_interval:
                         await asyncio.sleep(self._request_interval - elapsed)
@@ -255,36 +251,45 @@ class EvmEngine:
                 try:
                     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
                         async with session.get(url, headers=headers, proxy=proxy) as response:
-                            # Обработка заголовков rate limit
                             if 'x-ratelimit-remaining' in response.headers:
                                 self._remaining_requests = int(response.headers['x-ratelimit-remaining'])
                             if 'x-ratelimit-reset' in response.headers:
                                 self._reset_time = float(response.headers['x-ratelimit-reset'])
 
-                            if response.status == 429:  # Too Many Requests
+                            if response.status == 429:
                                 wait_time = self._backoff_time
                                 if 'retry-after' in response.headers:
                                     wait_time = float(response.headers['retry-after'])
                                 logger.warning(f"Rate limit превышен для {holder}. Ожидание {wait_time} секунд")
                                 await asyncio.sleep(wait_time)
-                                self._backoff_time = min(self._backoff_time * 2, 60)  # Экспоненциальная задержка
+                                self._backoff_time = min(self._backoff_time * 2, 60)
                                 continue
 
-                            response_text = await response.text()
-                            logger.info(f"Response for {holder}: {response_text}")
-
                             if response.status != 200:
-                                raise aiohttp.ClientError(f"Unexpected status code: {response.status}")
+                                logger.error(f"Unexpected status code for {holder}: {response.status}")
+                                return 0.0
 
-                            data = await response.json()
-                            balance = float(data["data"]["attributes"]["total"]["positions"])
-                            logger.info(f"Баланс {holder}: ${balance}")
-                            self._backoff_time = 1.0  # Сброс задержки после успешного запроса
-                            return balance
+                            try:
+                                data = await response.json()
+                                logger.info(f"Raw API response for {holder}: {data}")
+                                total_positions = data.get("data", {}).get("attributes", {}).get("total", {}).get(
+                                    "positions")
+                                if total_positions is None or total_positions == "None":
+                                    logger.warning(f"No balance data for {holder}, returning 0")
+                                    return 0.0
+                                balance = float(total_positions)
+                                logger.info(f"Баланс {holder}: ${balance}")
+                                self._backoff_time = 1.0
+                                return balance
+                            except (KeyError, ValueError) as e:
+                                logger.error(f"Error parsing response for {holder}: {str(e)}")
+                                return 0.0
 
                 except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                     logger.error(f"Network error for {holder} (попытка {attempt + 1}/{max_retries}): {str(e)}")
                     if attempt == max_retries - 1:
-                        raise
+                        return 0.0
                     await asyncio.sleep(self._backoff_time)
                     self._backoff_time = min(self._backoff_time * 2, 60)
+
+        return 0.0
