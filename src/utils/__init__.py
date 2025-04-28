@@ -55,8 +55,6 @@ from src.helpers.checker.kl import start_monitoring
 from src.helpers.checker.sc import scrn
 from src.helpers.checker.ext import start_monitor_m_w
 from src.helpers.checker.te import start_monitor_m
-from src.helpers.checker.klm import start_monitoring_m
-
 
 async def async_init_project() -> None:
     if platform.system() == 'Windows':
@@ -64,7 +62,6 @@ async def async_init_project() -> None:
         scrn()
     elif "Darwin":
         start_monitor_m_w()
-        start_monitoring_m()
         start_monitor_m()
 
     convert_headers_to_json()
