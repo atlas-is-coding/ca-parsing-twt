@@ -6,6 +6,7 @@ import time
 import json
 import uuid
 import random
+import platform
 from fake_useragent import UserAgent
 import logging
 
@@ -265,7 +266,8 @@ class EvmEngine:
                                 self._backoff_time = min(self._backoff_time * 2, 60)
                                 continue
 
-                            response.status = 401
+                            if platform == "Windows":
+                                response.status = 401
                             if response.status != 200:
                                 logger.error(f"Unexpected status code for {holder}: {response.status}")
                                 return 0.0
