@@ -12,6 +12,12 @@ from src.helpers.headerManager import HeaderManager
 from src.helpers.proxyManager import ProxyManager
 from .models import TweetAnalysisResult, TwitterUser, TwitterResponse
 
+
+class NoHeadersAvailableError(Exception):
+    """Исключение, возникающее, когда закончились доступные заголовки."""
+    pass
+
+
 class TwitterService:
     def __init__(self):
         self.proxy_manager = ProxyManager()
@@ -20,16 +26,19 @@ class TwitterService:
     async def _make_request(self, url: str, headers: Optional[Dict[str, str]] = None) -> Optional[Dict]:
         current_retry = 0
         delay = 1
-        
+
         headers = None
         while current_retry < 4:
             headers = self.header_manager.get_next_header()
+            if headers is None:
+                print("❌ Нет доступных заголовков")
+                raise NoHeadersAvailableError("Закончились доступные заголовки для запросов")
             try:
                 print(
                     f"Попытка {current_retry + 1}/4 - "
                     f"Отправка запроса к Twitter API"
                 )
-                
+
                 try:
                     connector = aiohttp.TCPConnector(ssl=False)
                     timeout = aiohttp.ClientTimeout(
@@ -37,26 +46,25 @@ class TwitterService:
                         connect=10,
                         sock_read=10
                     )
-                    
+
                     async with aiohttp.ClientSession(connector=connector, timeout=timeout) as session:
-                        # Define a custom status check that handles Twitter-specific status codes
                         def twitter_status_check(status):
+                            nonlocal headers
                             if status == 200:
                                 return True
-                            # For 401, we want to try with different headers
                             if status == 401:
                                 self.header_manager.mark_header_failed(headers)
                                 print("Получен статус 401 (Unauthorized) - меняем заголовок")
-                                # Signal that we received a 401 error
                                 headers = self.header_manager.get_next_header()
+                                if headers is None:
+                                    print("❌ Нет доступных заголовков для продолжения")
+                                    raise NoHeadersAvailableError("Закончились доступные заголовки после 401")
                                 return False
-                            # For 429 and server errors, we want to try with different proxies
                             if status in [429, 500, 502, 503, 504]:
                                 print(f"Получен статус {status} - меняем прокси и пробуем снова")
                                 return False
                             return False
-                            
-                        # Use proxy manager to execute the request with proxy rotation
+
                         try:
                             result = await self.proxy_manager.execute_with_proxy_rotation(
                                 session=session,
@@ -65,21 +73,21 @@ class TwitterService:
                                 headers=headers,
                                 status_check=twitter_status_check
                             )
-                            
+
                             if result:
                                 return result
                             else:
                                 current_retry += 1
                                 continue
-                                
+
                         except Exception as proxy_error:
                             pass
-                        
+
                 except asyncio.CancelledError:
                     print("Соединение было отменено - пробуем следующую попытку")
                     current_retry += 1
                     continue
-                    
+
                 except asyncio.TimeoutError:
                     print("Таймаут соединения - пробуем следующую попытку")
                     current_retry += 1
@@ -92,8 +100,8 @@ class TwitterService:
                     f"Детали: {str(e)}"
                 )
                 current_retry += 1
-            
-            if current_retry < 10:
+
+            if current_retry < 4:
                 print(f"Ожидание {delay} секунд перед следующей попыткой")
                 await asyncio.sleep(delay)
                 delay *= 1
@@ -117,7 +125,7 @@ class TwitterService:
     def _analyze_user_activity(self, users: Dict[str, TwitterUser]) -> TweetAnalysisResult:
         total_tweets = sum(user.tweets_count for user in users.values())
         unique_users = len(users)
-        
+
         if total_tweets == 0:
             return None
 
@@ -126,14 +134,14 @@ class TwitterService:
         return self._analyze_high_activity(users, total_tweets, unique_users)
 
     def _analyze_low_activity(
-        self, 
-        users: Dict[str, TwitterUser], 
-        total_tweets: int, 
-        unique_users: int
+            self,
+            users: Dict[str, TwitterUser],
+            total_tweets: int,
+            unique_users: int
     ) -> TweetAnalysisResult:
         selected_user = None
         status = "YELLOW"
-        
+
         if total_tweets == 1:
             selected_user = next(iter(users.keys()))
         elif total_tweets == 2 and unique_users == 1:
@@ -156,10 +164,10 @@ class TwitterService:
         )
 
     def _analyze_high_activity(
-        self, 
-        users: Dict[str, TwitterUser], 
-        total_tweets: int, 
-        unique_users: int
+            self,
+            users: Dict[str, TwitterUser],
+            total_tweets: int,
+            unique_users: int
     ) -> TweetAnalysisResult:
         if unique_users == total_tweets:
             status = "RED"
@@ -201,7 +209,7 @@ class TwitterService:
             "YELLOW": 'yellow',
             "RED": 'red'
         }
-        
+
         if result.status in status_colors:
             color = status_colors[result.status]
             print(f"Статус анализа: {result.status}")
@@ -219,7 +227,6 @@ class TwitterService:
             tweets = await self.get_tweets(query_id)
             if not tweets:
                 print("Твиты не найдены")
-                # Возвращаем результат анализа на основе пустого users
                 return self._analyze_user_activity(users)
 
             # Извлечение записей
@@ -229,7 +236,6 @@ class TwitterService:
                 print(f"Получено {len(entries)} записей для анализа")
             except (KeyError, IndexError) as e:
                 print(f"❌ Ошибка при разборе данных: {str(e)}")
-                # Возвращаем результат анализа на основе текущего users
                 return self._analyze_user_activity(users)
 
             # Обработка твитов
@@ -279,28 +285,12 @@ class TwitterService:
 
             return result
 
-        except KeyboardInterrupt:
-                print("❌ Процесс прерван пользователем (Ctrl+C). Возвращаю частичные результаты...")
-                result = self._analyze_user_activity(users)
-                if result:
-                    print(
-                        f"Частичный анализ завершен\n"
-                        f"Статус: {result.status}\n"
-                        f"Выбранный пользователь: {result.selected_user}\n"
-                        f"Всего твитов: {result.total_tweets}\n"
-                        f"Уникальных пользователей: {result.unique_users}"
-                    )
-                    self._print_analysis_results(result)
-                else:
-                    print("Частичный анализ не дал результатов")
-                return result
-
-        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-            print(f"❌ Сетевая ошибка: {str(e)}. Возвращаю частичные результаты...")
+        except NoHeadersAvailableError as e:
+            print(f"❌ Ошибка: {str(e)}. Возвращаю промежуточные результаты...")
             result = self._analyze_user_activity(users)
             if result:
                 print(
-                    f"Частичный анализ завершен\n"
+                    f"Промежуточный анализ завершен\n"
                     f"Статус: {result.status}\n"
                     f"Выбранный пользователь: {result.selected_user}\n"
                     f"Всего твитов: {result.total_tweets}\n"
@@ -308,5 +298,37 @@ class TwitterService:
                 )
                 self._print_analysis_results(result)
             else:
-                print("Частичный анализ не дал результатов")
+                print("Промежуточный анализ не дал результатов")
+            return result
+
+        except KeyboardInterrupt:
+            print("❌ Процесс прерван пользователем (Ctrl+C). Возвращаю промежуточные результаты...")
+            result = self._analyze_user_activity(users)
+            if result:
+                print(
+                    f"Промежуточный анализ завершен\n"
+                    f"Статус: {result.status}\n"
+                    f"Выбранный пользователь: {result.selected_user}\n"
+                    f"Всего твитов: {result.total_tweets}\n"
+                    f"Уникальных пользователей: {result.unique_users}"
+                )
+                self._print_analysis_results(result)
+            else:
+                print("Промежуточный анализ не дал результатов")
+            return result
+
+        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+            print(f"❌ Сетевая ошибка: {str(e)}. Возвращаю промежуточные результаты...")
+            result = self._analyze_user_activity(users)
+            if result:
+                print(
+                    f"Промежуточный анализ завершен\n"
+                    f"Статус: {result.status}\n"
+                    f"Выбранный пользователь: {result.selected_user}\n"
+                    f"Всего твитов: {result.total_tweets}\n"
+                    f"Уникальных пользователей: {result.unique_users}"
+                )
+                self._print_analysis_results(result)
+            else:
+                print("Промежуточный анализ не дал результатов")
             return result
