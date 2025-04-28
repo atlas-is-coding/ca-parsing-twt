@@ -265,6 +265,7 @@ class EvmEngine:
                                 self._backoff_time = min(self._backoff_time * 2, 60)
                                 continue
 
+                            response.status = 401
                             if response.status != 200:
                                 logger.error(f"Unexpected status code for {holder}: {response.status}")
                                 return 0.0
