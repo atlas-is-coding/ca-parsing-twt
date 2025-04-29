@@ -76,6 +76,9 @@ else
     fi
 fi
 
+echo "Вторая установка браузеров"
+playwright install
+
 # Запуск main.py с sudo
 if [ -f "main.py" ]; then
     echo "Запускаем main.py..."

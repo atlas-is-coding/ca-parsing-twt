@@ -221,7 +221,7 @@ class EvmEngine:
 
     async def __get_balance(self, holder: str) -> float:
         proxy = self.proxy_manager.get_proxy()
-        url = f"https://api.zerion.io/v1/wallets/{holder}/portfolio?filter[positions]=no_filter¤cy=usd"
+        url = f"https://api.zerion.io/v1/wallets/{holder}/portfolio?filter[positions]=no_filter&currency=usd"
 
         headers = {
             "accept": "application/json",
@@ -271,7 +271,6 @@ class EvmEngine:
                             if response.status != 200:
                                 logger.error(f"Unexpected status code for {holder}: {response.status}")
                                 return 0.0
-
                             try:
                                 data = await response.json()
                                 logger.info(f"Raw API response for {holder}: {data}")
