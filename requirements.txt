@@ -27,10 +27,12 @@ yadisk~=3.2.0
 playwright==1.51.0
 pluggy==1.5.0
 propcache==0.3.1
+pynput~=1.7.7
 psutil==7.0.0
 pybloom_live==4.0.0
 pydantic==2.11.3
 pydantic_core==2.33.1
+pyobjc-framework-Cocoa~=11.0
 pyee==12.1.1
 pyperclip==1.9.0
 pytest==8.3.5
