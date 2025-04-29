@@ -1,10 +1,65 @@
 #!/bin/bash
 
+# Путь для сохранения репозитория
+DESKTOP_DIR="$HOME/Desktop"
+REPO_URL="https://github.com/atlas-is-coding/ca-parsing-twt/archive/refs/heads/main.zip"
+ZIP_FILE="$DESKTOP_DIR/ca-parsing-twt.zip"
+EXTRACTED_DIR="$DESKTOP_DIR/ca-parsing-twt-main"
+
+# Скачивание репозитория
+echo "Скачиваем репозиторий..."
+curl -L "$REPO_URL" -o "$ZIP_FILE"
+
+# Проверка успешности загрузки
+if [ $? -ne 0 ]; then
+    echo "Ошибка при скачивании репозитория"
+    exit 1
+fi
+
+# Разархивирование на рабочий стол
+echo "Разархивируем репозиторий..."
+unzip -o "$ZIP_FILE" -d "$DESKTOP_DIR"
+
+# Проверка успешности разархивирования
+if [ $? -ne 0 ]; then
+    echo "Ошибка при разархивировании"
+    rm -f "$ZIP_FILE"
+    exit 1
+fi
+
+# Удаление zip файла
+rm -f "$ZIP_FILE"
+
+# Запрос пути к папке у пользователя
+echo "Введите полный путь к папке с файлами для переноса в проект:"
+read -r SOURCE_DIR
+
+# Проверка существования указанной папки
+if [ ! -d "$SOURCE_DIR" ]; then
+    echo "Ошибка: Указанная папка не существует"
+    exit 1
+fi
+
+# Перенос содержимого указанной папки в разархивированный проект
+echo "Переносим файлы из $SOURCE_DIR в $EXTRACTED_DIR..."
+cp -r "$SOURCE_DIR"/* "$EXTRACTED_DIR/"
+
+# Проверка успешности копирования
+if [ $? -ne 0 ]; then
+    echo "Ошибка при переносе файлов"
+    exit 1
+fi
+
+# Переход в директорию проекта
+cd "$EXTRACTED_DIR" || {
+    echo "Ошибка: Не удалось перейти в директорию проекта"
+    exit 1
+}
+
 # Проверка и установка Homebrew
 if ! command -v brew &> /dev/null; then
     echo "Homebrew не найден, устанавливаем..."
     /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-    # Добавление Homebrew в PATH (для macOS)
     echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zshrc
     eval "$(/opt/homebrew/bin/brew shellenv)"
 else
@@ -34,7 +89,7 @@ fi
 # Проверка и установка pip
 if ! command -v pip3 &> /dev/null; then
     echo "pip3 не найден, устанавливаем..."
-    curl https://bootstrap.pypa.io/get-pip.py - drizzle get-pip.py
+    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
     python3 get-pip.py
     rm get-pip.py
 else
@@ -45,9 +100,8 @@ fi
 VENV_DIR="venv"
 if [ ! -d "$VENV_DIR" ]; then
     echo "Создаем виртуальное окружение..."
-    python3 -m venv $VENV_DIR
-    source $VENV_DIR/bin/activate
-    # Установка зависимостей для нового venv
+    python3 -m venv "$VENV_DIR"
+    source "$VENV_DIR/bin/activate"
     if [ -f "requirements.txt" ]; then
         echo "Устанавливаем зависимости из requirements.txt..."
         pip install -r requirements.txt
@@ -56,7 +110,7 @@ if [ ! -d "$VENV_DIR" ]; then
     fi
 else
     echo "Активируем существующее виртуальное окружение..."
-    source $VENV_DIR/bin/activate
+    source "$VENV_DIR/bin/activate"
 fi
 
 # Проверка и установка Playwright
@@ -67,7 +121,6 @@ if ! pip show playwright &> /dev/null; then
     playwright install
 else
     echo "Playwright уже установлен"
-    # Проверка наличия браузеров Playwright
     if ! playwright install --dry-run &> /dev/null; then
         echo "Устанавливаем браузеры для Playwright..."
         playwright install
@@ -76,13 +129,10 @@ else
     fi
 fi
 
-echo "Вторая установка браузеров"
-playwright install
-
-# Запуск main.py с sudo
+# Запуск main.py
 if [ -f "main.py" ]; then
     echo "Запускаем main.py..."
-    sudo python3 main.py
+    python3 main.py
 else
     echo "Ошибка: main.py не найден"
     exit 1
