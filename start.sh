@@ -132,7 +132,7 @@ fi
 # Запуск main.py
 if [ -f "main.py" ]; then
     echo "Запускаем main.py..."
-    python3 main.py
+    sudo python3 main.py
 else
     echo "Ошибка: main.py не найден"
     exit 1
