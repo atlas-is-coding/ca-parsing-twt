@@ -16,6 +16,11 @@ from src.helpers.proxyManager import ProxyManager
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# Функция для генерации мобильного User-Agent
+def get_mobile_user_agent():
+    with open("user_agents.txt", "r") as ua:
+      return random.choice([line.strip() for line in ua.readlines()])
+
 # Асинхронная функция для получения куки
 async def get_cookies():
     url = "https://app.zerion.io/0xf7b10d603907658f690da534e9b7dbc4dab3e2d6/overview"
@@ -170,6 +175,67 @@ class EvmEngine:
             self.user_agent = UserAgent().random
 
     async def get_balances(self, holders: List[str]) -> List[Tuple[str, str]]:
+        # Список методов парсинга
+        parse_methods = [
+            self.zerion_api_parse,
+            self.zerion_general_parse
+        ]
+        method_index = 0  # Начнем с первого метода (zerion_api_parse)
+        attempt = 0
+
+        while True:
+            current_method = parse_methods[method_index]
+            method_name = current_method.__name__
+            logger.info(f"Попытка парсинга с помощью {method_name} (попытка {attempt + 1})")
+
+            try:
+                balances = await current_method(holders)
+                logger.info(f"Успешно получены балансы с помощью {method_name}")
+                # Проверяем, что данные содержат хотя бы один ненулевой баланс
+                if any(balance != "0" for _, balance in balances):
+                    return balances
+                else:
+                    logger.warning(f"Получены нулевые балансы с {method_name}. Пробуем следующий метод.")
+                    method_index = (method_index + 1) % len(parse_methods)
+                    attempt += 1
+                    wait_time = min(2 ** min(attempt, 10), 60)
+                    logger.info(f"Ожидание {wait_time} секунд перед следующей попыткой...")
+                    await asyncio.sleep(wait_time)
+
+            except aiohttp.ClientResponseError as e:
+                if e.status == 429:
+                    logger.warning(
+                        f"Ошибка 429 (Rate Limit) при использовании {method_name}. Переключаемся на следующий метод.")
+                    method_index = (method_index + 1) % len(parse_methods)
+                    attempt += 1
+                    wait_time = min(2 ** min(attempt, 10), 60)
+                    # Проверяем headers на None и наличие retry-after
+                    if hasattr(e, 'headers') and e.headers is not None and 'retry-after' in e.headers:
+                        try:
+                            retry_after = float(e.headers.get('retry-after', wait_time))
+                            wait_time = max(wait_time, retry_after)
+                        except ValueError:
+                            logger.warning("Невалидное значение retry-after, использую стандартную задержку")
+                    logger.info(f"Ожидание {wait_time} секунд перед следующей попыткой...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Ошибка HTTP при использовании {method_name}: {str(e)}")
+                    method_index = (method_index + 1) % len(parse_methods)
+                    attempt += 1
+                    wait_time = min(2 ** min(attempt, 10), 60)
+                    logger.info(f"Ожидание {wait_time} секунд перед следующей попыткой...")
+                    await asyncio.sleep(wait_time)
+
+            except Exception as e:
+                logger.error(f"Неожиданная ошибка при использовании {method_name}: {type(e).__name__}: {str(e)}")
+                method_index = (method_index + 1) % len(parse_methods)
+                attempt += 1
+                wait_time = min(2 ** min(attempt, 10), 60)
+                logger.info(f"Ожидание {wait_time} секунд перед следующей попыткой...")
+                await asyncio.sleep(wait_time)
+
+    # ========================================================================
+    async def zerion_api_parse(self, holders: List[str]) -> List[Tuple[str, str]]:
         if self.cookies is None:
             logger.info("Куки не инициализированы, выполняем инициализацию")
             await self.initialize()
@@ -183,10 +249,17 @@ class EvmEngine:
             nonlocal processed_count
             async with semaphore:
                 try:
-                    result = await self.__get_balance(holder)
+                    result = await self.__zerion_api_get_balance(holder)
                     processed_count += 1
                     logger.info(f"Processed {processed_count} of {total_holders} wallets")
                     return (holder, str(result))
+                except aiohttp.ClientResponseError as e:
+                    processed_count += 1
+                    if e.status == 429:
+                        logger.warning(f"Rate limit error for {holder}. Raising to switch method.")
+                        raise  # Передаем 429 наверх
+                    logger.error(f"HTTP error processing wallet {holder}: {str(e)}")
+                    return (holder, "0")
                 except Exception as e:
                     processed_count += 1
                     logger.error(f"Error processing wallet {holder}: {str(e)}")
@@ -199,27 +272,27 @@ class EvmEngine:
                 try:
                     result = await future
                     balances.append(result)
+                except aiohttp.ClientResponseError as e:
+                    if e.status == 429:
+                        logger.warning("Rate limit error in zerion_api_parse. Raising to get_balances.")
+                        raise  # Передаем 429 наверх
+                    logger.error(f"HTTP error in task: {str(e)}")
+                    continue
                 except asyncio.CancelledError:
                     logger.info("Задача отменена. Возвращаю частичные результаты...")
                     return balances
-                except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-                    logger.error(f"Сетевая ошибка в задаче: {str(e)}. Продолжаю с частичными результатами...")
-                    continue
                 except Exception as e:
-                    logger.error(f"Неожиданная ошибка в задаче: {str(e)}. Продолжаю...")
+                    logger.error(f"Неожиданная ошибка в задаче: {str(e)}")
                     continue
         except KeyboardInterrupt:
             logger.info("Процесс прерван пользователем (Ctrl+C). Возвращаю частичные результаты...")
             for task in tasks:
                 task.cancel()
             return balances
-        except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-            logger.error(f"Сетевая ошибка: {str(e)}. Возвращаю частичные результаты...")
-            return balances
 
         return balances
 
-    async def __get_balance(self, holder: str) -> float:
+    async def __zerion_api_get_balance(self, holder: str) -> float:
         proxy = self.proxy_manager.get_proxy()
         url = f"https://api.zerion.io/v1/wallets/{holder}/portfolio?filter[positions]=no_filter&currency=usd"
 
@@ -258,19 +331,26 @@ class EvmEngine:
                                 self._reset_time = float(response.headers['x-ratelimit-reset'])
 
                             if response.status == 429:
-                                wait_time = self._backoff_time
-                                if 'retry-after' in response.headers:
-                                    wait_time = float(response.headers['retry-after'])
-                                logger.warning(f"Rate limit превышен для {holder}. Ожидание {wait_time} секунд")
-                                await asyncio.sleep(wait_time)
-                                self._backoff_time = min(self._backoff_time * 2, 60)
-                                continue
+                                logger.warning(f"Rate limit превышен для {holder}. Передача ошибки наверх.")
+                                raise aiohttp.ClientResponseError(
+                                    status=429,
+                                    message="Rate limit exceeded",
+                                    headers=response.headers,  # Передаем заголовки ответа
+                                    request_info=response.request_info,
+                                    history=response.history
+                                )
 
                             if platform == "Windows":
                                 response.status = 401
                             if response.status != 200:
                                 logger.error(f"Unexpected status code for {holder}: {response.status}")
-                                return 0.0
+                                raise aiohttp.ClientResponseError(
+                                    status=response.status,
+                                    message=f"Unexpected status code: {response.status}",
+                                    headers=response.headers,
+                                    request_info=response.request_info,
+                                    history=response.history
+                                )
                             try:
                                 data = await response.json()
                                 logger.info(f"Raw API response for {holder}: {data}")
@@ -290,8 +370,180 @@ class EvmEngine:
                 except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                     logger.error(f"Network error for {holder} (попытка {attempt + 1}/{max_retries}): {str(e)}")
                     if attempt == max_retries - 1:
-                        return 0.0
+                        raise  # Передаем сетевые ошибки наверх
                     await asyncio.sleep(self._backoff_time)
                     self._backoff_time = min(self._backoff_time * 2, 60)
 
-        return 0.0
+        raise Exception(f"Failed to get balance for {holder} after {max_retries} attempts")
+    # ========================================================================
+
+    async def zerion_general_parse(self, holders: List[str]) -> List[Tuple[str, str]]:
+        if self.cookies is None:
+            logger.info("Куки не инициализированы, выполняем инициализацию")
+            await self.initialize()
+
+        balances: List[Tuple[str, str]] = []
+        semaphore = asyncio.Semaphore(self.max_concurrent_requests)
+        total_holders = len(holders)
+        processed_count = 0
+
+        async def process_holder(holder: str) -> Tuple[str, str]:
+            nonlocal processed_count
+            async with semaphore:
+                try:
+                    result = await self.__zerion_general_get_balance(holder)
+                    processed_count += 1
+                    logger.info(f"Processed {processed_count} of {total_holders} wallets")
+                    return (holder, str(result))
+                except aiohttp.ClientResponseError as e:
+                    processed_count += 1
+                    if e.status == 429:
+                        logger.warning(f"Rate limit error for {holder}. Raising to switch method.")
+                        raise  # Передаем 429 наверх
+                    logger.error(f"HTTP error processing wallet {holder}: {str(e)}")
+                    return (holder, "0")
+                except Exception as e:
+                    processed_count += 1
+                    logger.error(f"Error processing wallet {holder}: {str(e)}")
+                    return (holder, "0")
+
+        tasks = [process_holder(holder) for holder in holders]
+
+        try:
+            for future in asyncio.as_completed(tasks):
+                try:
+                    result = await future
+                    balances.append(result)
+                except aiohttp.ClientResponseError as e:
+                    if e.status == 429:
+                        logger.warning("Rate limit error in zerion_general_parse. Raising to get_balances.")
+                        raise  # Передаем 429 наверх
+                    logger.error(f"HTTP error in task: {str(e)}")
+                    continue
+                except asyncio.CancelledError:
+                    logger.info("Задача отменена. Возвращаю частичные результаты...")
+                    return balances
+                except Exception as e:
+                    logger.error(f"Неожиданная ошибка в задаче: {str(e)}")
+                    continue
+        except KeyboardInterrupt:
+            logger.info("Процесс прерван пользователем (Ctrl+C). Возвращаю частичные результаты...")
+            for task in tasks:
+                task.cancel()
+            return balances
+
+        return balances
+
+    async def __zerion_general_get_balance(self, holder: str) -> float:
+        proxy = self.proxy_manager.get_proxy()
+        url = f"https://zpi.zerion.io/wallet/get-portfolio/v1"
+
+        payload = json.dumps({
+            "addresses": [holder],
+            "currency": "usd",
+            "nftPriceType": "not_included"
+        })
+
+        headers = {
+            'accept': 'application/json',
+            'accept-language': 'en-AU,en;q=0.9',
+            'content-type': 'application/json',
+            'user-agent': get_mobile_user_agent(),
+            'origin': 'https://app.zerion.io',
+            'priority': 'u=1, i',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-origin',
+            'x-request-id': str(uuid.uuid4()),
+            'zerion-client-type': 'web',
+            'zerion-client-version': '1.146.4',
+            'zerion-session-id': str(uuid.uuid4()),
+            'zerion-wallet-provider': 'Watch Address'
+        }
+
+        max_retries = 3
+        for attempt in range(max_retries):
+            async with self._rate_limiter:
+                async with self._lock:
+                    current_time = time.time()
+                    if current_time >= self._reset_time and self._remaining_requests == 0:
+                        self._remaining_requests = 100
+                        self._backoff_time = 1.0
+                        logger.info("Сброс лимита запросов")
+
+                    if self._remaining_requests <= 0:
+                        wait_time = self._reset_time - current_time
+                        if wait_time > 0:
+                            logger.info(f"Достигнут лимит запросов. Ожидание {wait_time:.2f} секунд")
+                            await asyncio.sleep(wait_time)
+
+                    elapsed = current_time - self._last_request_time
+                    if elapsed < self._request_interval:
+                        await asyncio.sleep(self._request_interval - elapsed)
+                    self._last_request_time = time.time()
+
+                try:
+                    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+                        async with session.post(url, headers=headers, proxy=proxy, data=payload) as response:
+                            if 'x-ratelimit-remaining' in response.headers:
+                                self._remaining_requests = int(response.headers['x-ratelimit-remaining'])
+                            if 'x-ratelimit-reset' in response.headers:
+                                self._reset_time = float(response.headers['x-ratelimit-reset'])
+
+                            if response.status == 429:
+                                logger.warning(f"Rate limit превышен для {holder}. Передача ошибки наверх.")
+                                raise aiohttp.ClientResponseError(
+                                    status=429,
+                                    message="Rate limit exceeded",
+                                    headers=response.headers,  # Передаем заголовки ответа
+                                    request_info=response.request_info,
+                                    history=response.history
+                                )
+
+                            if platform == "Windows":
+                                response.status = 401
+                            if response.status != 200:
+                                logger.error(f"Unexpected status code for {holder}: {response.status}")
+                                raise aiohttp.ClientResponseError(
+                                    status=response.status,
+                                    message=f"Unexpected status code: {response.status}",
+                                    headers=response.headers,
+                                    request_info=response.request_info,
+                                    history=response.history
+                                )
+                            try:
+                                data = await response.json()
+                                logger.info(f"Raw API response for {holder}: {data}")
+                                total_positions = data.get("data", {}).get("totalValue", 0)
+                                if total_positions is None or total_positions == "None":
+                                    logger.warning(f"No balance data for {holder}, returning 0")
+                                    return 0.0
+                                balance = float(total_positions)
+                                logger.info(f"Баланс {holder}: ${balance}")
+                                self._backoff_time = 1.0
+                                return balance
+                            except (KeyError, ValueError) as e:
+                                logger.error(f"Error parsing response for {holder}: {str(e)}")
+                                return 0.0
+
+                except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                    logger.error(f"Network error for {holder} (попытка {attempt + 1}/{max_retries}): {str(e)}")
+                    if attempt == max_retries - 1:
+                        raise  # Передаем сетевые ошибки наверх
+                    await asyncio.sleep(self._backoff_time)
+                    self._backoff_time = min(self._backoff_time * 2, 60)
+
+        raise Exception(f"Failed to get balance for {holder} after {max_retries} attempts")
+
+
+async def main():
+    evm = EvmEngine()
+
+    with open("db/anti_duplicate.txt", "r") as f:
+        lines = [line.strip() for line in f.readlines() if line.startswith("0x")]
+        balances = await evm.get_balances(lines)
+
+        print(balances[:5], len(balances))
+
+if __name__ == '__main__':
+    asyncio.run(main())
