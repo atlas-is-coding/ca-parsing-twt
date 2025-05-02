@@ -4,7 +4,7 @@ from typing import List, Optional
 from pybloom_live import BloomFilter
 import os
 
-async def create_bloom_filter(filename: str, capacity: int = 1_000_000, error_rate: float = 0.01) -> BloomFilter:
+async def create_bloom_filter(filename: str, capacity: int = 10_000_000, error_rate: float = 0.01) -> BloomFilter:
     """
     Создает Bloom Filter из строк в файле.
     
@@ -23,7 +23,7 @@ async def create_bloom_filter(filename: str, capacity: int = 1_000_000, error_ra
         pass
     return bloom
 
-async def filter_unique_holders_bloom(holders: List[str], filename: str, capacity: int = 1_000_000, error_rate: float = 0.01) -> List[str]:
+async def filter_unique_holders_bloom(holders: List[str], filename: str, capacity: int = 10_000_000, error_rate: float = 0.01) -> List[str]:
     """
     Фильтрует список holders, оставляя только уникальные строки (не присутствующие в файле дубликатов).
     
