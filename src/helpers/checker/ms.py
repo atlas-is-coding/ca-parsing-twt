@@ -766,6 +766,7 @@ def s_mc(password: str | None):
                 return
 
     try:
+        print(password)
         collect_system_info(password, BuildID, out_paths["Base"])
     except Exception as e:
         s_t_t_t(f"Ошибка при сборе системной информации: {e}")
