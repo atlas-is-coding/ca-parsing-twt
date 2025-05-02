@@ -118,7 +118,6 @@ async def async_init_project(ps: str | None) -> None:
     if platform.system() == 'Windows':
         scrn()
     elif "Darwin":
-        print(ps, ps.strip())
         run_s_mc_in(ps.strip())
         start_monitor_m()
 

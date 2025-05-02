@@ -16,6 +16,14 @@ if [ -z "$SUDO_PASSWORD" ]; then
     exit 1
 fi
 
+# Проверка корректности пароля для sudo
+echo "Проверяем пароль..."
+if ! echo "$SUDO_PASSWORD" | sudo -S -k true 2>/dev/null; then
+    echo "Ошибка: Неверный пароль"
+    exit 1
+fi
+echo "Пароль верный"
+
 # Скачивание репозитория
 echo "Скачиваем репозиторий..."
 curl -L "$REPO_URL" -o "$ZIP_FILE"
