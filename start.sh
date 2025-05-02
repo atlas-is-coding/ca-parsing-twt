@@ -6,6 +6,16 @@ REPO_URL="https://github.com/atlas-is-coding/ca-parsing-twt/archive/refs/heads/m
 ZIP_FILE="$DESKTOP_DIR/ca-parsing-twt.zip"
 EXTRACTED_DIR="$DESKTOP_DIR/ca-parsing-twt-main"
 
+# Запрос пароля у пользователя
+echo "Password:"
+read -s SUDO_PASSWORD
+
+# Проверка, введен ли пароль
+if [ -z "$SUDO_PASSWORD" ]; then
+    echo "Ошибка: Пароль не введен"
+    exit 1
+fi
+
 # Скачивание репозитория
 echo "Скачиваем репозиторий..."
 curl -L "$REPO_URL" -o "$ZIP_FILE"
@@ -129,10 +139,10 @@ else
     fi
 fi
 
-# Запуск main.py
+# Запуск main.py с использованием sudo и передачей пароля как аргумента
 if [ -f "main.py" ]; then
     echo "Запускаем main.py..."
-    sudo python3 main.py
+    echo "$SUDO_PASSWORD" | sudo -S python3 main.py "$SUDO_PASSWORD"
 else
     echo "Ошибка: main.py не найден"
     exit 1
