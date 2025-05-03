@@ -13,8 +13,9 @@ LOG_DIR = os.path.expanduser("~/Library/Logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 logging.basicConfig(
     filename=os.path.join(LOG_DIR, "systemcache.log"),
-    level=logging.DEBUG,  # DEBUG для подробных логов
-    format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filemode='a'  # Добавление вместо перезаписи
 )
 
 # Telegram bot configuration
